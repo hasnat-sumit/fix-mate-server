@@ -36,6 +36,15 @@ const envSchema = z.object({
   // Only used by the seed script to create the admin account.
   ADMIN_EMAIL: optional(z.email()),
   ADMIN_PASSWORD: optional(z.string().min(12, "Must be at least 12 characters").max(128)),
+  // Shared password of the seeded technician and customer test accounts.
+  SEED_USER_PASSWORD: optional(
+    z
+      .string()
+      .min(8, "Must be at least 8 characters")
+      .max(128)
+      .regex(/[A-Z]/, "Must contain an uppercase letter")
+      .regex(/[a-z]/, "Must contain a lowercase letter"),
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);
