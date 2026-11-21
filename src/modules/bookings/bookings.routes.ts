@@ -2,11 +2,13 @@ import { Router } from "express";
 import type { Types } from "mongoose";
 import { AppError, isDuplicateKeyError, type ErrorCode } from "../../lib/errors.js";
 import { paginate } from "../../lib/pagination.js";
+import { countsByKey } from "../../lib/stats.js";
 import { isObjectIdString } from "../../lib/validators.js";
-import { authUser, requireAuth, requireRole, type AuthUser } from "../../middleware/auth.js";
+import { authUser, verifyCustomer, verifyTechnician, verifyToken, type AuthUser } from "../../middleware/auth.js";
+import { PaymentModel } from "../payments/payments.model.js";
 import { ServiceModel } from "../services/services.model.js";
 import { UserModel } from "../users/users.model.js";
-import { BookingModel, bookingStatusFields, type Booking } from "./bookings.model.js";
+import { ACTIVE_BOOKING_STATUSES, BOOKING_STATUSES, BookingModel, bookingStatusFields, type Booking, type BookingStatus } from "./bookings.model.js";
 import { createBookingBody, createReviewBody, listBookingsQuery, updateStatusBody } from "./bookings.schemas.js";
 import { checkTransition } from "./bookings.workflow.js";
 
@@ -32,8 +34,47 @@ export async function listBookings(ownerFilter: Record<string, unknown>, rawQuer
   return { items, page, limit: query.limit, total, pageCount };
 }
 
+/** Booking counts per status for one owner filter, with every status present. */
+async function statusCounts(ownerFilter: Record<string, unknown>) {
+  const rows = await BookingModel.aggregate<{ _id: string; count: number }>([
+    { $match: ownerFilter },
+    { $group: { _id: "$status", count: { $sum: 1 } } },
+  ]);
+  return countsByKey(BOOKING_STATUSES, rows) as Record<BookingStatus, number>;
+}
+
+async function paidTotal(filter: Record<string, unknown>) {
+  const [row] = await PaymentModel.aggregate<{ total: number }>([{ $match: filter }, { $group: { _id: null, total: { $sum: "$amount" } } }]);
+  return Math.round((row?.total ?? 0) * 100) / 100;
+}
+
+/**
+ * Moves a booking to `next` if the workflow allows it, conditional on the status that was checked,
+ * so two people acting at once can't both succeed. Ownership is part of the query.
+ */
+async function changeStatus(req: Parameters<typeof authUser>[0], next: BookingStatus, extra: Record<string, unknown> = {}) {
+  const id = req.params.id;
+  if (!isObjectIdString(id)) throw notFound();
+  const user = authUser(req);
+  const scope = { _id: id, ...accessFilter(user) };
+
+  const current = await BookingModel.findOne(scope).select("status").lean();
+  if (!current) throw notFound();
+
+  const check = checkTransition(current.status, next, user.role);
+  if (!check.ok) throw new AppError(check.status, ERROR_CODES[check.status], check.message);
+
+  const updated = await BookingModel.findOneAndUpdate(
+    { ...scope, status: current.status },
+    { $set: { ...bookingStatusFields(next), ...extra }, $push: { statusHistory: { status: next, changedAt: new Date() } } },
+    { returnDocument: "after", runValidators: true },
+  ).lean<BookingDoc>();
+  if (!updated) throw new AppError(409, "CONFLICT", "This booking was just updated. Refresh and try again.");
+  return updated;
+}
+
 // POST /api/bookings — customers send a repair request. Price and technician come from the database, never the client.
-bookingsRouter.post("/", requireAuth, requireRole("customer"), async (req, res) => {
+bookingsRouter.post("/", verifyToken, verifyCustomer, async (req, res) => {
   const body = createBookingBody.parse(req.body);
   const user = authUser(req);
 
@@ -76,53 +117,77 @@ bookingsRouter.post("/", requireAuth, requireRole("customer"), async (req, res) 
   res.status(201).json({ success: true, data: booking.toObject() });
 });
 
-// GET /api/bookings/mine — the customer's own requests. GET /api/bookings/jobs — the technician's jobs.
-// Both are registered before /:id so the words are never treated as IDs.
-bookingsRouter.get("/mine", requireAuth, requireRole("customer"), async (req, res) => {
+// --- customer --- (registered before /:id so the words are never treated as IDs)
+
+// GET /api/bookings/my — the customer's own bookings. The email always comes from the token, never the URL.
+bookingsRouter.get("/my", verifyToken, verifyCustomer, async (req, res) => {
   res.json({ success: true, data: await listBookings({ customerEmail: authUser(req).email }, req.query) });
 });
 
-bookingsRouter.get("/jobs", requireAuth, requireRole("technician"), async (req, res) => {
+// GET /api/bookings/my/stats — customer overview cards and chart.
+bookingsRouter.get("/my/stats", verifyToken, verifyCustomer, async (req, res) => {
+  const email = authUser(req).email;
+  const [byStatus, totalPaid] = await Promise.all([statusCounts({ customerEmail: email }), paidTotal({ customerEmail: email })]);
+  const total = Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+  res.json({
+    success: true,
+    data: {
+      totalRequests: total,
+      activeJobs: ACTIVE_BOOKING_STATUSES.reduce((sum, status) => sum + byStatus[status], 0),
+      completedJobs: byStatus.completed,
+      totalPaid,
+      byStatus,
+    },
+  });
+});
+
+// --- technician ---
+
+// GET /api/bookings/technician — jobs where technicianEmail is the signed-in technician.
+bookingsRouter.get("/technician", verifyToken, verifyTechnician, async (req, res) => {
   res.json({ success: true, data: await listBookings({ technicianEmail: authUser(req).email }, req.query) });
 });
 
+// GET /api/bookings/technician/stats — technician overview cards and chart.
+bookingsRouter.get("/technician/stats", verifyToken, verifyTechnician, async (req, res) => {
+  const email = authUser(req).email;
+  const [totalServices, approvedServices, byStatus, totalEarned] = await Promise.all([
+    ServiceModel.countDocuments({ technicianEmail: email }),
+    ServiceModel.countDocuments({ technicianEmail: email, approvalStatus: "approved" }),
+    statusCounts({ technicianEmail: email }),
+    paidTotal({ technicianEmail: email }),
+  ]);
+  res.json({
+    success: true,
+    data: { totalServices, approvedServices, pendingRequests: byStatus.requested, totalEarned, byStatus },
+  });
+});
+
+// --- shared ---
+
 // GET /api/bookings/:id — details and timeline, for the booking's customer, its technician or an admin.
-bookingsRouter.get("/:id", requireAuth, async (req, res) => {
+bookingsRouter.get("/:id", verifyToken, async (req, res) => {
   if (!isObjectIdString(req.params.id)) throw notFound();
   const booking = await BookingModel.findOne({ _id: req.params.id, ...accessFilter(authUser(req)) }).lean<BookingDoc>();
   if (!booking) throw notFound();
   res.json({ success: true, data: booking });
 });
 
-// PATCH /api/bookings/:id/status — moves the job along the pipeline (see bookings.workflow.ts).
-bookingsRouter.patch("/:id/status", requireAuth, requireRole("customer", "technician"), async (req, res) => {
-  if (!isObjectIdString(req.params.id)) throw notFound();
+// PATCH /api/bookings/:id/cancel — the booking's customer cancels while it is still "requested".
+bookingsRouter.patch("/:id/cancel", verifyToken, verifyCustomer, async (req, res) => {
+  res.json({ success: true, data: await changeStatus(req, "cancelled") });
+});
+
+// PATCH /api/bookings/:id/status — the job's technician moves it along the pipeline (see bookings.workflow.ts).
+// Completing requires { status: "completed", finalAmount > 0 }.
+bookingsRouter.patch("/:id/status", verifyToken, verifyTechnician, async (req, res) => {
   const body = updateStatusBody.parse(req.body);
-  const user = authUser(req);
-  const scope = { _id: req.params.id, ...accessFilter(user) };
-
-  const current = await BookingModel.findOne(scope).select("status").lean();
-  if (!current) throw notFound();
-
-  const check = checkTransition(current.status, body.status, user.role);
-  if (!check.ok) throw new AppError(check.status, ERROR_CODES[check.status], check.message);
-
-  // Conditional on the status we checked, so two people acting at once can't both succeed.
-  const updated = await BookingModel.findOneAndUpdate(
-    { ...scope, status: current.status },
-    {
-      $set: { ...bookingStatusFields(body.status), ...(body.status === "completed" ? { finalAmount: body.finalAmount } : {}) },
-      $push: { statusHistory: { status: body.status, changedAt: new Date() } },
-    },
-    { returnDocument: "after", runValidators: true },
-  ).lean<BookingDoc>();
-  if (!updated) throw new AppError(409, "CONFLICT", "This booking was just updated. Refresh and try again.");
-
-  res.json({ success: true, data: updated });
+  const extra = body.status === "completed" ? { finalAmount: body.finalAmount } : {};
+  res.json({ success: true, data: await changeStatus(req, body.status, extra) });
 });
 
 // POST /api/bookings/:id/review — one rating & review per paid booking, by its customer.
-bookingsRouter.post("/:id/review", requireAuth, requireRole("customer"), async (req, res) => {
+bookingsRouter.post("/:id/review", verifyToken, verifyCustomer, async (req, res) => {
   if (!isObjectIdString(req.params.id)) throw notFound();
   const body = createReviewBody.parse(req.body);
   const scope = { _id: req.params.id, customerEmail: authUser(req).email };
