@@ -1,0 +1,10 @@
+node_modules/
+dist/
+
+# Local environment files stay private; the documented template is committed.
+.env*
+!.env.example
+
+# logs and OS files
+*.log
+.DS_Store
