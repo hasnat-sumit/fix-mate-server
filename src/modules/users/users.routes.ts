@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { AppError } from "../../lib/errors.js";
 import { authUser, requireAuth } from "../../middleware/auth.js";
+import { ServiceModel } from "../services/services.model.js";
 import { UserModel } from "./users.model.js";
 
 export const usersRouter = Router();
@@ -39,6 +40,11 @@ usersRouter.patch("/me", requireAuth, async (req, res) => {
     if (value === "" && field !== "name") $unset[field] = "";
     else $set[field] = value;
   }
-  await UserModel.updateOne({ _id: authUser(req).id }, { $set, $unset }, { runValidators: true });
+  const user = authUser(req);
+  await UserModel.updateOne({ _id: user.id }, { $set, $unset }, { runValidators: true });
+  // Services carry a copy of the technician's name; keep it current. Bookings keep the name they were made with.
+  if (body.name && user.role === "technician") {
+    await ServiceModel.updateMany({ technicianEmail: user.email }, { $set: { technicianName: body.name } });
+  }
   res.json({ success: true, data: await findProfile(authUser(req).id) });
 });

@@ -1,40 +1,38 @@
 import { model, Schema, type InferSchemaType } from "mongoose";
-import { wholeCents } from "../../lib/validators.js";
+import { usdAmount } from "../../lib/validators.js";
 
-export const PAYMENT_STATUSES = ["pending", "paid", "failed"] as const;
-
-/** Unique only when the field holds a string, so documents without it never collide. */
-const uniqueWhenPresent = (field: string) => ({
-  unique: true,
-  partialFilterExpression: { [field]: { $type: "string" } },
-});
-
+/**
+ * The payment record of a paid job. Created only by the server after Stripe confirms the payment
+ * (success-page verification or webhook); every value is copied from the booking, never from the client.
+ */
 const paymentSchema = new Schema(
   {
-    bookingId: { type: Schema.Types.ObjectId, ref: "Booking", required: true },
-    customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    technicianId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    /** Copied from the booking on the server; never accepted from the client. */
-    amount: { type: Number, required: true, min: 100, validate: wholeCents },
+    bookingId: { type: String, required: true },
+    serviceTitle: { type: String, required: true },
+    customerName: { type: String, required: true },
+    customerEmail: { type: String, required: true, lowercase: true },
+    technicianName: { type: String, required: true },
+    technicianEmail: { type: String, required: true, lowercase: true },
+    /** Paid amount in USD (= booking.finalAmount). */
+    amount: { type: Number, required: true, min: 1, validate: usdAmount },
     currency: { type: String, enum: ["usd"], required: true, default: "usd" },
-    status: { type: String, enum: PAYMENT_STATUSES, required: true, default: "pending" },
-    provider: { type: String, enum: ["stripe"], required: true, default: "stripe" },
-    stripeCheckoutSessionId: { type: String },
-    stripePaymentIntentId: { type: String },
-    receiptUrl: { type: String },
-    paidAt: { type: Date },
-    invoiceNumber: { type: String },
+    /** Stripe payment_intent id. */
+    transactionId: { type: String, required: true },
+    /** Stripe Checkout Session id. */
+    stripeSessionId: { type: String, required: true },
+    paymentStatus: { type: String, enum: ["paid"], required: true, default: "paid" },
+    paidAt: { type: Date, required: true, default: Date.now },
   },
-  { collection: "payments", timestamps: true },
+  { collection: "payments", timestamps: true, versionKey: false },
 );
 
-// One payment record per booking: repeat checkouts update it instead of creating duplicates.
+// Never save the same payment twice: once per booking and once per Checkout Session,
+// even when the success page and the webhook (or a webhook retry) race each other.
 paymentSchema.index({ bookingId: 1 }, { unique: true });
-paymentSchema.index({ stripeCheckoutSessionId: 1 }, uniqueWhenPresent("stripeCheckoutSessionId"));
-paymentSchema.index({ stripePaymentIntentId: 1 }, uniqueWhenPresent("stripePaymentIntentId"));
-paymentSchema.index({ invoiceNumber: 1 }, uniqueWhenPresent("invoiceNumber"));
-paymentSchema.index({ customerId: 1, createdAt: -1 });
-paymentSchema.index({ technicianId: 1, createdAt: -1 });
+paymentSchema.index({ stripeSessionId: 1 }, { unique: true });
+paymentSchema.index({ customerEmail: 1, paidAt: -1 });
+paymentSchema.index({ technicianEmail: 1, paidAt: -1 });
+paymentSchema.index({ paidAt: -1 });
 
 export type Payment = InferSchemaType<typeof paymentSchema>;
 export const PaymentModel = model("Payment", paymentSchema);

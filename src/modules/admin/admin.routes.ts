@@ -10,7 +10,7 @@ import { BOOKING_STATUSES, BookingModel } from "../bookings/bookings.model.js";
 import { listBookings } from "../bookings/bookings.routes.js";
 import { PaymentModel } from "../payments/payments.model.js";
 import { APPROVAL_STATUSES, ServiceModel } from "../services/services.model.js";
-import { toOwnerView, type ServiceDoc } from "../services/services.routes.js";
+import type { ServiceDoc } from "../services/services.routes.js";
 import { USER_ROLES, USER_STATUSES, UserModel } from "../users/users.model.js";
 
 export const adminRouter = Router();
@@ -27,7 +27,7 @@ adminRouter.get("/stats", async (_req, res) => {
     ServiceModel.aggregate<{ _id: string; count: number }>([{ $group: { _id: "$approvalStatus", count: { $sum: 1 } } }]),
     BookingModel.aggregate<{ _id: string; count: number }>([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     PaymentModel.aggregate<{ total: number; count: number }>([
-      { $match: { status: "paid" } },
+      { $match: { paymentStatus: "paid" } },
       { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
     ]),
   ]);
@@ -109,65 +109,33 @@ adminRouter.patch("/users/:id", async (req, res) => {
 // --- services ---
 
 const listServicesQuery = z.object({ approvalStatus: z.enum(APPROVAL_STATUSES).optional(), ...pageQuery });
-type Technician = { _id: Types.ObjectId; name: string; email: string } | null;
 
 adminRouter.get("/services", async (req, res) => {
   const query = listServicesQuery.parse(req.query);
   const filter = query.approvalStatus ? { approvalStatus: query.approvalStatus } : {};
   const total = await ServiceModel.countDocuments(filter);
   const { page, pageCount, skip } = paginate(total, query.page, query.limit);
-  const services = await ServiceModel.find(filter)
-    // The approval queue reads oldest first, so nothing waits indefinitely.
-    .sort(query.approvalStatus === "pending" ? { updatedAt: 1, _id: 1 } : { updatedAt: -1, _id: -1 })
-    .skip(skip)
-    .limit(query.limit)
-    .populate<{ technicianId: Technician }>("technicianId", "name email")
-    .lean<(Omit<ServiceDoc, "technicianId"> & { technicianId: Technician })[]>();
-
-  const items = services.map(({ technicianId, ...service }) => ({
-    ...toOwnerView({ ...service, technicianId: technicianId?._id ?? service._id }),
-    technician: technicianId
-      ? { id: technicianId._id.toString(), name: technicianId.name, email: technicianId.email }
-      : { id: null, name: "Deleted account", email: "" },
-  }));
+  // Pending services come first so they are easy to find, then the rest by latest change.
+  const items = await ServiceModel.aggregate<ServiceDoc>([
+    { $match: filter },
+    { $addFields: { pendingFirst: { $cond: [{ $eq: ["$approvalStatus", "pending"] }, 0, 1] } } },
+    { $sort: { pendingFirst: 1, updatedAt: -1, _id: -1 } },
+    { $skip: skip },
+    { $limit: query.limit },
+    { $project: { pendingFirst: 0 } },
+  ]);
   res.json({ success: true, data: { items, page, limit: query.limit, total, pageCount } });
 });
 
-const approvalBody = z
-  .strictObject({ status: z.enum(["approved", "rejected"]), reason: z.string().trim().max(500).optional() })
-  .refine((body) => body.status !== "rejected" || Boolean(body.reason), { message: "Add a reason for the technician", path: ["reason"] });
+const approvalBody = z.strictObject({ approvalStatus: z.enum(["approved", "rejected"]) });
 
-// PATCH /api/admin/services/:id/approval — approve, or reject with a reason the technician can see.
+// PATCH /api/admin/services/:id/approval — approve or reject any service.
 adminRouter.patch("/services/:id/approval", async (req, res) => {
   if (!isObjectIdString(req.params.id)) throw new AppError(404, "NOT_FOUND", "Service not found");
-  const body = approvalBody.parse(req.body);
-  const update =
-    body.status === "approved"
-      ? { $set: { approvalStatus: "approved" }, $unset: { rejectionReason: "" } }
-      : // A rejected service can't stay featured.
-        { $set: { approvalStatus: "rejected", rejectionReason: body.reason, isFeatured: false } };
-  const service = await ServiceModel.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true }).lean<ServiceDoc>();
+  const { approvalStatus } = approvalBody.parse(req.body);
+  const service = await ServiceModel.findByIdAndUpdate(req.params.id, { $set: { approvalStatus } }, { returnDocument: "after" }).lean<ServiceDoc>();
   if (!service) throw new AppError(404, "NOT_FOUND", "Service not found");
-  res.json({ success: true, data: toOwnerView(service) });
-});
-
-const featuredBody = z.strictObject({ isFeatured: z.boolean() });
-
-// PATCH /api/admin/services/:id/featured — controls the homepage's featured services. Only approved services can be featured.
-adminRouter.patch("/services/:id/featured", async (req, res) => {
-  if (!isObjectIdString(req.params.id)) throw new AppError(404, "NOT_FOUND", "Service not found");
-  const { isFeatured } = featuredBody.parse(req.body);
-  const service = await ServiceModel.findOneAndUpdate(
-    { _id: req.params.id, ...(isFeatured ? { approvalStatus: "approved" } : {}) },
-    { $set: { isFeatured } },
-    { returnDocument: "after" },
-  ).lean<ServiceDoc>();
-  if (!service) {
-    const exists = await ServiceModel.exists({ _id: req.params.id });
-    if (!exists) throw new AppError(404, "NOT_FOUND", "Service not found");
-    throw new AppError(409, "CONFLICT", "Only approved services can be featured");
-  }
-  res.json({ success: true, data: toOwnerView(service) });
+  res.json({ success: true, data: service });
 });
 
 // --- bookings ---

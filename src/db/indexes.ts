@@ -13,10 +13,13 @@ import { getNativeDb } from "./client.js";
  */
 export async function ensureIndexes() {
   await Promise.all([
+    // The users collection is shared with Better Auth, whose own indexes must survive: only add, never drop.
     UserModel.createIndexes(),
-    ServiceModel.createIndexes(),
-    BookingModel.createIndexes(),
-    PaymentModel.createIndexes(),
+    // These collections belong to the app alone, so their indexes are synced to the schemas,
+    // which also drops indexes left over from earlier schema versions.
+    ServiceModel.syncIndexes(),
+    BookingModel.syncIndexes(),
+    PaymentModel.syncIndexes(),
   ]);
 
   const db = getNativeDb();

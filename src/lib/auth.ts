@@ -51,6 +51,10 @@ function createAuth() {
         // `input: false`: never settable through sign-up or any auth endpoint. The hook below assigns it.
         role: { type: [...USER_ROLES], required: true, defaultValue: "customer", input: false },
         status: { type: [...USER_STATUSES], required: true, defaultValue: "active", input: false },
+        // Profile fields, filled in later through PATCH /api/users/me (not at sign-up).
+        phone: { type: "string", required: false, input: false },
+        area: { type: "string", required: false, input: false },
+        bio: { type: "string", required: false, input: false },
       },
     },
     session: {
