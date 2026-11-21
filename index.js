@@ -3,19 +3,23 @@
 // It uses the output of `npm run build` (dist/), which vercel.json runs first.
 // Local development is unchanged: `npm run dev` runs src/server.ts as a normal long-running server.
 import express from "express";
-import { createApp } from "./dist/app.js";
-import { connectDatabase } from "./dist/db/client.js";
-import { initAuth } from "./dist/lib/auth.js";
 
 /** @type {Promise<import("express").Express> | undefined} */
 let ready;
 
 /**
- * Connects to MongoDB and sets up Better Auth once per function instance; warm requests reuse it.
+ * Loads the API, connects to MongoDB and sets up Better Auth once per function instance; warm requests
+ * reuse it. Imported lazily so a start-up problem (e.g. a missing environment variable) is caught,
+ * logged and answered with a 503 instead of crashing the function.
  * Indexes are not created here (that would slow every cold start); `npm run seed` creates them.
  */
 function getApp() {
   ready ??= (async () => {
+    const [{ createApp }, { connectDatabase }, { initAuth }] = await Promise.all([
+      import("./dist/app.js"),
+      import("./dist/db/client.js"),
+      import("./dist/lib/auth.js"),
+    ]);
     await connectDatabase();
     initAuth();
     return createApp();
@@ -36,9 +40,9 @@ app.use((req, res, next) => {
     .catch(next);
 });
 
-// Only reached when start-up fails (e.g. the database is unreachable); the API has its own error handler.
+// Only reached when start-up fails; the details go to the logs (Vercel → Logs), never to the client.
 app.use((error, _req, res, _next) => {
-  console.error("FixMate API failed to start:", error);
+  console.error("FixMate API failed to start:", error instanceof Error ? error.message : error);
   res.status(503).json({ success: false, code: "SERVICE_UNAVAILABLE", message: "The service is starting or temporarily unavailable. Please try again." });
 });
 

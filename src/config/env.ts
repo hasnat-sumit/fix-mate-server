@@ -66,7 +66,10 @@ const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   // Fail fast with a readable list of problems instead of starting with a broken configuration.
-  console.error("Invalid environment configuration:\n" + z.prettifyError(parsed.error));
+  const message = "Invalid environment configuration:\n" + z.prettifyError(parsed.error);
+  // On Vercel, exiting would crash every request without explanation; throw so the entry logs it and replies 503.
+  if (process.env.VERCEL) throw new Error(message);
+  console.error(message);
   process.exit(1);
 }
 
