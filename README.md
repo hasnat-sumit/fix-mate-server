@@ -53,6 +53,39 @@ See [`.env.example`](.env.example) for the full, documented list.
 
 Never commit `.env`; it is git-ignored.
 
+## API
+
+Private routes need `Authorization: Bearer <JWT>` (issued by Better Auth). Missing or invalid token → **401**; wrong role → **403**. Users only ever reach their own data: the email is taken from the token, never from the URL.
+
+| Method & path | Middlewares | Purpose |
+| --- | --- | --- |
+| `GET /api/services` | public | Approved, available services. `?search=&category=&serviceMode=&sort=newest|price-asc|price-desc&page=&limit=` |
+| `GET /api/services/featured` | public | 6 latest approved services |
+| `GET /api/services/:id` | public | Service details with technician summary |
+| `POST /api/bookings` | verifyToken, verifyCustomer | Send a repair request |
+| `GET /api/bookings/my` | verifyToken, verifyCustomer | My bookings (`?status=`) |
+| `GET /api/bookings/my/stats` | verifyToken, verifyCustomer | Customer overview stats |
+| `PATCH /api/bookings/:id/cancel` | verifyToken, verifyCustomer | Cancel a `requested` booking |
+| `POST /api/bookings/:id/review` | verifyToken, verifyCustomer | Rate a paid job |
+| `GET /api/payments/my` | verifyToken, verifyCustomer | My payment history |
+| `POST /api/services` | verifyToken, verifyTechnician | Add a service (starts `pending`) |
+| `GET /api/services/my` | verifyToken, verifyTechnician | My services |
+| `PATCH /api/services/:id` | verifyToken, verifyTechnician | Edit (back to `pending`) or toggle `isAvailable` |
+| `DELETE /api/services/:id` | verifyToken, verifyTechnician | Delete a service |
+| `GET /api/bookings/technician` | verifyToken, verifyTechnician | Jobs for my services (`?status=`) |
+| `GET /api/bookings/technician/stats` | verifyToken, verifyTechnician | Technician overview stats |
+| `PATCH /api/bookings/:id/status` | verifyToken, verifyTechnician | Move a job along the pipeline (`finalAmount` required for `completed`) |
+| `GET /api/admin/stats` | verifyToken, verifyAdmin | Admin overview stats and chart data |
+| `GET /api/admin/users` | verifyToken, verifyAdmin | All users |
+| `PATCH /api/admin/users/:id/role` | verifyToken, verifyAdmin | Change a user's role (not your own) |
+| `PATCH /api/admin/users/:id/status` | verifyToken, verifyAdmin | Suspend / reactivate a user |
+| `GET /api/admin/services` | verifyToken, verifyAdmin | All services, pending first (`?approvalStatus=`) |
+| `PATCH /api/admin/services/:id/approval` | verifyToken, verifyAdmin | Approve or reject a service |
+| `GET /api/admin/bookings` | verifyToken, verifyAdmin | All bookings (`?status=`) |
+| `GET /api/admin/payments` | verifyToken, verifyAdmin | All payments with total revenue |
+| `GET /api/users/profile` / `PATCH /api/users/profile` | verifyToken | Read / update my profile |
+| `GET /api/bookings/:id` | verifyToken | One booking (own bookings only; admins see all) |
+
 ## Scripts
 
 | Command             | Description |
