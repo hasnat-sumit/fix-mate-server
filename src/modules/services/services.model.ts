@@ -1,60 +1,51 @@
 import { model, Schema, type InferSchemaType } from "mongoose";
-import { imageUrl, wholeCents } from "../../lib/validators.js";
+import { imageUrl, usdAmount } from "../../lib/validators.js";
 
-/** Keep in sync with `serviceCategories` in the frontend's src/data/service-categories.ts. */
+/** Keep in sync with the frontend's src/data/service-categories.ts. */
 export const SERVICE_CATEGORIES = [
   "Smartphone",
   "Laptop & PC",
-  "Air Conditioning",
-  "Home Appliances",
-  "Television",
-  "Electrical Services",
-  "Other Repairs",
+  "AC",
+  "Refrigerator",
+  "TV",
+  "Washing Machine",
+  "Electrical",
 ] as const;
 
+export const SERVICE_MODES = ["Home Visit", "Shop Drop-off"] as const;
 export const APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
 
+export type ServiceCategory = (typeof SERVICE_CATEGORIES)[number];
+
+/**
+ * A repair service offered by a technician. The owner is linked by `technicianEmail` (= users.email);
+ * the technician's name is copied in so listings never need a join.
+ */
 const serviceSchema = new Schema(
   {
-    technicianId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true, trim: true, minlength: 3, maxlength: 100 },
     category: { type: String, enum: SERVICE_CATEGORIES, required: true },
-    description: { type: String, required: true, trim: true, minlength: 10, maxlength: 200 },
-    details: { type: String, trim: true, maxlength: 2000, default: "" },
-    /** Starting price in cents (USD). */
-    price: { type: Number, required: true, min: 100, max: 1_000_000, validate: wholeCents },
+    description: { type: String, required: true, trim: true, minlength: 20, maxlength: 2000 },
+    /** Service banner (ImgBB URL). */
     image: { type: String, required: true, trim: true, validate: imageUrl },
-    includes: {
-      type: [{ type: String, trim: true, maxlength: 100 }],
-      default: [],
-      validate: { validator: (items: string[]) => items.length <= 10, message: "At most 10 included items" },
-    },
-    availability: { type: String, trim: true, maxlength: 120, default: "" },
+    /** Starting price in USD, shown on cards. */
+    basePrice: { type: Number, required: true, min: 1, max: 10_000, validate: usdAmount },
+    estimatedDuration: { type: String, required: true, trim: true, maxlength: 50 },
+    serviceMode: { type: String, enum: SERVICE_MODES, required: true },
+    serviceArea: { type: String, required: true, trim: true, maxlength: 100 },
+    technicianName: { type: String, required: true, trim: true },
+    technicianEmail: { type: String, required: true, trim: true, lowercase: true },
     approvalStatus: { type: String, enum: APPROVAL_STATUSES, required: true, default: "pending" },
-    rejectionReason: {
-      type: String,
-      trim: true,
-      maxlength: 500,
-      required: [
-        function (this: { approvalStatus?: string }) {
-          return this.approvalStatus === "rejected";
-        },
-        "A rejection reason is required",
-      ],
-    },
-    /** The technician can hide a service without deleting it. */
-    isActive: { type: Boolean, required: true, default: true },
-    /** Admin-controlled flag for the homepage's featured services. */
-    isFeatured: { type: Boolean, required: true, default: false },
-    /** Real aggregates, recalculated from booking reviews (phase B6). Never seeded with invented values. */
-    ratingAverage: { type: Number, min: 0, max: 5, default: 0 },
-    reviewCount: { type: Number, min: 0, default: 0 },
+    /** The technician can turn the service on/off without deleting it. */
+    isAvailable: { type: Boolean, required: true, default: true },
   },
-  { collection: "services", timestamps: true },
+  { collection: "services", timestamps: true, versionKey: false },
 );
 
-serviceSchema.index({ technicianId: 1 });
-serviceSchema.index({ approvalStatus: 1, isActive: 1, category: 1, price: 1 });
+serviceSchema.index({ technicianEmail: 1, createdAt: -1 });
+// Public catalog: approved + available, filtered by category/mode and sorted by price or date.
+serviceSchema.index({ approvalStatus: 1, isAvailable: 1, category: 1, basePrice: 1 });
+serviceSchema.index({ approvalStatus: 1, isAvailable: 1, createdAt: -1 });
 
 export type Service = InferSchemaType<typeof serviceSchema>;
 export const ServiceModel = model("Service", serviceSchema);
