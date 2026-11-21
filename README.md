@@ -1,8 +1,39 @@
-# FixMate Server
+# FixMate Server: Repair Service Platform API
 
-Express 5 REST API for FixMate, a platform for booking home and device repair services. It handles authentication, users, services, bookings and admin operations.
+REST API for **FixMate**, a role-based platform where verified technicians list device and home-appliance repair services, customers request repairs and track each job, and pay with Stripe **only after the job is completed**. Admins approve services, manage users and monitor jobs and revenue.
 
-The frontend lives in a separate repository: **fixmate-client** (Next.js).
+| | |
+| --- | --- |
+| **API (live)** | `https://<your-server>.onrender.com` _(add after deploying; health check: `/api/health`)_ |
+| **Live site** | `https://<your-client>.vercel.app` _(add after deploying)_ |
+| **Client repo** | https://github.com/hasnat-sumit/fix-mate |
+| **Server repo** | https://github.com/hasnat-sumit/fix-mate-server |
+
+**Admin:** `<ADMIN_EMAIL>` / `<ADMIN_PASSWORD>`. Technician and customer test accounts are listed under [Seed data](#seed-data).
+
+## Key features
+
+- **Better Auth** (MongoDB adapter) email/password auth; its `users` collection carries `role`, `phone`, `area`, `bio` as additional fields. Sign-up accepts only customer/technician (anything else is saved as customer); admins come from the seed.
+- **JWT** issued by Better Auth, verified by custom middlewares `verifyToken` (401) and `verifyCustomer` / `verifyTechnician` / `verifyAdmin` (403). Data access is scoped by the token's email, never by the URL.
+- Exactly **4 collections**: `users`, `services`, `bookings`, `payments`, with the fields from the assignment's data design.
+- **Server-side search, filter, sort and pagination** for the public catalog (MongoDB queries, not client-side filtering).
+- **Job status pipeline** enforced on the server (requested → accepted / rejected / cancelled, accepted → in-progress → completed with `finalAmount`), with ownership checks and race-safe conditional updates; one active request per customer and service (unique index).
+- **Stripe Checkout + signed webhook**: amounts come from the database; each payment is saved exactly once.
+- **ImgBB** uploads proxied through the API, so the key stays server-side.
+- Zod validation, Helmet, strict CORS, consistent JSON errors, and an idempotent seed with connected demo data.
+
+### npm packages
+
+| Package | Used for |
+| --- | --- |
+| `express` | HTTP server and routing |
+| `mongoose` | MongoDB models, validation and indexes |
+| `better-auth` | Authentication, sessions and JWT issuing (MongoDB adapter, JWT plugin) |
+| `jose` | Verifying the API JWTs (EdDSA, JWKS) |
+| `stripe` | Checkout Sessions and webhook signature verification |
+| `zod` | Request and environment validation |
+| `helmet`, `cors` | Security headers and allowed origins |
+| `typescript`, `tsx`, `@types/*` | Tooling (build, dev server, seed script) |
 
 ## Tech stack
 
@@ -109,6 +140,16 @@ Both 2 and 3 go through one function that inserts the payment and marks the book
 **Webhook setup (test mode):** in the Stripe Dashboard add an endpoint `https://<server>/api/payments/webhook` for `checkout.session.completed`, and put its signing secret in `STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:5000/api/payments/webhook`.
 
 Test card: `4242 4242 4242 4242`, any future date, any CVC.
+
+## Deployment (Render)
+
+1. **MongoDB Atlas:** create a cluster and a database user; under Network Access allow `0.0.0.0/0` (Render has no fixed IP). Copy the connection string into `MONGODB_URI`.
+2. **Render → New Web Service** from this repo. Runtime: Node. Build command: `npm ci && npm run build`. Start command: `npm start`. Health check path: `/api/health`.
+3. **Environment:** `NODE_ENV=production`, `MONGODB_URI`, `MONGODB_DB_NAME`, `BETTER_AUTH_SECRET` (32+ random characters), `BETTER_AUTH_URL=https://<your-client>.vercel.app`, `CLIENT_ORIGINS=https://<your-client>.vercel.app` (comma-separate extra origins, e.g. a custom domain), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `IMGBB_API_KEY`. Render sets `PORT` itself.
+4. **Stripe webhook:** Dashboard (test mode) → Developers → Webhooks → add `https://<your-server>.onrender.com/api/payments/webhook` for `checkout.session.completed`; copy its signing secret into `STRIPE_WEBHOOK_SECRET` and redeploy.
+5. **Seed the production database** from your machine, with the production values in `.env` (plus `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SEED_USER_PASSWORD`): `npm run seed`. If `NODE_ENV=production` is set locally, use `npm run seed -- --allow-production`.
+
+Render's free plan sleeps after 15 minutes idle and takes up to a minute to wake. Before a review, open `/api/health` once (or keep it warm with an uptime pinger) so the first request isn't slow.
 
 ## Scripts
 
