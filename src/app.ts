@@ -8,6 +8,7 @@ import { getAuth } from "./lib/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { bookingsRouter } from "./modules/bookings/bookings.routes.js";
+import { paymentsRouter } from "./modules/payments/payments.routes.js";
 import { servicesRouter } from "./modules/services/services.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
 
@@ -37,6 +38,7 @@ export function createApp() {
 
   app.use("/api/admin", adminRouter);
   app.use("/api/bookings", bookingsRouter);
+  app.use("/api/payments", paymentsRouter);
   app.use("/api/services", servicesRouter);
   app.use("/api/users", usersRouter);
 
