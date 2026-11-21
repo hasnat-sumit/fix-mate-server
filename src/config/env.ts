@@ -33,6 +33,11 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url({ protocol: /^https?$/ }),
   JWT_ISSUER: optional(z.string().min(1)),
   JWT_AUDIENCE: z.string().min(1).default("fixmate-api"),
+  // Stripe (test mode). Payments return 503 without the secret key; the webhook needs its signing secret.
+  STRIPE_SECRET_KEY: optional(z.string().regex(/^sk_(test|live)_/, "Must be a Stripe secret key (sk_test_...)")),
+  STRIPE_WEBHOOK_SECRET: optional(z.string().regex(/^whsec_/, "Must be a Stripe webhook signing secret (whsec_...)")),
+  // Where Stripe sends customers back after Checkout. Defaults to BETTER_AUTH_URL (the frontend origin).
+  CLIENT_URL: optional(z.url({ protocol: /^https?$/ })),
   // ImgBB API key for service images and profile photos (https://api.imgbb.com). Uploads return 503 without it.
   IMGBB_API_KEY: optional(z.string().min(10)),
   // Only used by the seed script to create the admin account.
@@ -61,5 +66,6 @@ export const env = {
   ...parsed.data,
   // Better Auth's JWT plugin also defaults the issuer to its base URL; both sides must agree.
   JWT_ISSUER: parsed.data.JWT_ISSUER ?? parsed.data.BETTER_AUTH_URL,
+  CLIENT_URL: (parsed.data.CLIENT_URL ?? parsed.data.BETTER_AUTH_URL).replace(/\/+$/, ""),
 };
 export const isProduction = env.NODE_ENV === "production";
