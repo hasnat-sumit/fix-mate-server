@@ -14,18 +14,18 @@ export type AuthUser = {
 declare global {
   namespace Express {
     interface Request {
-      /** Set by `requireAuth`. */
+      /** Set by `verifyToken`. */
       user?: AuthUser;
     }
   }
 }
 
 /**
- * Accepts only `Authorization: Bearer <JWT>`; cookies are ignored, which also rules out CSRF on the API.
- * The user is reloaded from the database, so suspensions and role changes apply immediately
- * rather than when the 15-minute token expires.
+ * 401 unless the request carries a valid `Authorization: Bearer <JWT>` issued by Better Auth.
+ * Cookies are ignored, which also rules out CSRF on the API. The user is reloaded from the database,
+ * so suspensions and role changes apply immediately rather than when the 15-minute token expires.
  */
-export const requireAuth: RequestHandler = async (req, _res, next) => {
+export const verifyToken: RequestHandler = async (req, _res, next) => {
   const token = /^Bearer\s+(\S+)$/i.exec(req.get("authorization") ?? "")?.[1];
   if (!token) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
 
@@ -46,8 +46,8 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   next();
 };
 
-/** Use after `requireAuth`. Allows the request only for the listed roles. */
-export function requireRole(...roles: UserRole[]): RequestHandler {
+/** Use after `verifyToken`: 403 unless the signed-in user has one of the given roles. */
+function verifyRole(...roles: UserRole[]): RequestHandler {
   return (req, _res, next) => {
     if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
     if (!roles.includes(req.user.role)) {
@@ -57,7 +57,11 @@ export function requireRole(...roles: UserRole[]): RequestHandler {
   };
 }
 
-/** The signed-in user for a route behind `requireAuth`. */
+export const verifyCustomer = verifyRole("customer");
+export const verifyTechnician = verifyRole("technician");
+export const verifyAdmin = verifyRole("admin");
+
+/** The signed-in user for a route behind `verifyToken`. */
 export function authUser(req: Request): AuthUser {
   if (!req.user) throw new AppError(401, "UNAUTHORIZED", "Authentication required");
   return req.user;

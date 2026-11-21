@@ -11,7 +11,7 @@ const SELF_SERVICE_ROLES = ["customer", "technician"] as const satisfies readonl
 
 /**
  * Endpoints that would write user data without the API's validation. Profile edits go through
- * PATCH /api/users/me instead (a later phase); social sign-in and account deletion are not offered.
+ * PATCH /api/users/profile instead; social sign-in and account deletion are not offered.
  */
 const DISABLED_AUTH_PATHS = [
   "/update-user",
@@ -51,7 +51,7 @@ function createAuth() {
         // `input: false`: never settable through sign-up or any auth endpoint. The hook below assigns it.
         role: { type: [...USER_ROLES], required: true, defaultValue: "customer", input: false },
         status: { type: [...USER_STATUSES], required: true, defaultValue: "active", input: false },
-        // Profile fields, filled in later through PATCH /api/users/me (not at sign-up).
+        // Profile fields, filled in later through PATCH /api/users/profile (not at sign-up).
         phone: { type: "string", required: false, input: false },
         area: { type: "string", required: false, input: false },
         bio: { type: "string", required: false, input: false },

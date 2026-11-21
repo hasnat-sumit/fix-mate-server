@@ -3,7 +3,7 @@ import type { SortOrder, Types } from "mongoose";
 import { AppError } from "../../lib/errors.js";
 import { paginate } from "../../lib/pagination.js";
 import { escapeRegex, isObjectIdString } from "../../lib/validators.js";
-import { authUser, requireAuth, requireRole } from "../../middleware/auth.js";
+import { authUser, verifyTechnician, verifyToken } from "../../middleware/auth.js";
 import { BookingModel } from "../bookings/bookings.model.js";
 import { UserModel } from "../users/users.model.js";
 import { SERVICE_CATEGORIES, ServiceModel, type Service } from "./services.model.js";
@@ -60,9 +60,9 @@ servicesRouter.get("/featured", async (_req, res) => {
   res.json({ success: true, data: items });
 });
 
-// GET /api/services/mine — the signed-in technician's services in every approval state.
-// Registered before /:id so "mine" is never treated as an ID.
-servicesRouter.get("/mine", requireAuth, requireRole("technician"), async (req, res) => {
+// GET /api/services/my — the signed-in technician's services in every approval state.
+// Registered before /:id so "my" is never treated as an ID.
+servicesRouter.get("/my", verifyToken, verifyTechnician, async (req, res) => {
   const items = await ServiceModel.find({ technicianEmail: authUser(req).email }).sort({ createdAt: -1 }).lean<ServiceDoc[]>();
   res.json({ success: true, data: items });
 });
@@ -87,7 +87,7 @@ servicesRouter.get("/:id", async (req, res) => {
 });
 
 // POST /api/services — technicians create services; every new service waits for admin approval.
-servicesRouter.post("/", requireAuth, requireRole("technician"), async (req, res) => {
+servicesRouter.post("/", verifyToken, verifyTechnician, async (req, res) => {
   const body = createServiceBody.parse(req.body);
   const user = authUser(req);
   const service = await ServiceModel.create({
@@ -102,7 +102,7 @@ servicesRouter.post("/", requireAuth, requireRole("technician"), async (req, res
 
 // PATCH /api/services/:id — owner edits. Editing any content sends the service back to "pending";
 // toggling `isAvailable` alone does not.
-servicesRouter.patch("/:id", requireAuth, requireRole("technician"), async (req, res) => {
+servicesRouter.patch("/:id", verifyToken, verifyTechnician, async (req, res) => {
   if (!isObjectIdString(req.params.id)) throw notFound();
   const body = updateServiceBody.parse(req.body);
   // Ownership is part of the query, so another technician's service is indistinguishable from a missing one.
@@ -119,7 +119,7 @@ servicesRouter.patch("/:id", requireAuth, requireRole("technician"), async (req,
 });
 
 // DELETE /api/services/:id — bookings keep their own copy of the service details, so history stays intact.
-servicesRouter.delete("/:id", requireAuth, requireRole("technician"), async (req, res) => {
+servicesRouter.delete("/:id", verifyToken, verifyTechnician, async (req, res) => {
   if (!isObjectIdString(req.params.id)) throw notFound();
   const service = await ServiceModel.findOne({ _id: req.params.id, technicianEmail: authUser(req).email });
   if (!service) throw notFound();
