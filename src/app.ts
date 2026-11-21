@@ -10,6 +10,7 @@ import { adminRouter } from "./modules/admin/admin.routes.js";
 import { bookingsRouter } from "./modules/bookings/bookings.routes.js";
 import { paymentsRouter } from "./modules/payments/payments.routes.js";
 import { servicesRouter } from "./modules/services/services.routes.js";
+import { uploadsRouter } from "./modules/uploads/uploads.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
 
 /** Requires `initAuth()` to have run, which in turn requires a connected database. */
@@ -40,6 +41,7 @@ export function createApp() {
   app.use("/api/bookings", bookingsRouter);
   app.use("/api/payments", paymentsRouter);
   app.use("/api/services", servicesRouter);
+  app.use("/api/uploads", uploadsRouter);
   app.use("/api/users", usersRouter);
 
   app.use(notFoundHandler);

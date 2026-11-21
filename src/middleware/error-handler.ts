@@ -1,4 +1,4 @@
-import type { ErrorRequestHandler, RequestHandler } from "express";
+import type { ErrorRequestHandler, Request, RequestHandler } from "express";
 import { z } from "zod";
 import { isProduction } from "../config/env.js";
 import { AppError, isDuplicateKeyError, type ErrorCode } from "../lib/errors.js";
@@ -22,7 +22,7 @@ function isBodyParserError(error: unknown): error is { status: number; type: str
   );
 }
 
-function toResponse(error: unknown): { status: number; body: ErrorBody } {
+function toResponse(error: unknown, req: Request): { status: number; body: ErrorBody } {
   if (error instanceof AppError) {
     return {
       status: error.statusCode,
@@ -44,7 +44,8 @@ function toResponse(error: unknown): { status: number; body: ErrorBody } {
 
   if (isBodyParserError(error)) {
     if (error.type === "entity.too.large") {
-      return { status: 413, body: { success: false, code: "PAYLOAD_TOO_LARGE", message: "Request body is too large" } };
+      const message = req.path.startsWith("/api/uploads") ? "Images must be 5 MB or smaller" : "Request body is too large";
+      return { status: 413, body: { success: false, code: "PAYLOAD_TOO_LARGE", message } };
     }
     if (error.type === "entity.parse.failed") {
       return { status: 400, body: { success: false, code: "BAD_REQUEST", message: "Malformed JSON body" } };
@@ -59,7 +60,7 @@ export const notFoundHandler: RequestHandler = (req, _res, next) => {
 };
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
-  const { status, body } = toResponse(error);
+  const { status, body } = toResponse(error, req);
 
   if (status >= 500) {
     // Unexpected failures are logged in full on the server but never leaked to the client.

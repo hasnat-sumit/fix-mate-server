@@ -33,6 +33,8 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url({ protocol: /^https?$/ }),
   JWT_ISSUER: optional(z.string().min(1)),
   JWT_AUDIENCE: z.string().min(1).default("fixmate-api"),
+  // ImgBB API key for service images and profile photos (https://api.imgbb.com). Uploads return 503 without it.
+  IMGBB_API_KEY: optional(z.string().min(10)),
   // Only used by the seed script to create the admin account.
   ADMIN_EMAIL: optional(z.email()),
   ADMIN_PASSWORD: optional(z.string().min(12, "Must be at least 12 characters").max(128)),

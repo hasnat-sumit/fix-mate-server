@@ -6,6 +6,9 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "PAYLOAD_TOO_LARGE"
+  | "UNSUPPORTED_MEDIA_TYPE"
+  | "BAD_GATEWAY"
+  | "SERVICE_UNAVAILABLE"
   | "INTERNAL_ERROR";
 
 /** An expected, client-safe error. Its message is always shown to the client. */

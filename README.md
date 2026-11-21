@@ -9,6 +9,7 @@ The frontend lives in a separate repository: **fixmate-client** (Next.js).
 - Node.js 22.12+, Express 5, TypeScript
 - MongoDB with Mongoose
 - Better Auth (sessions + JWT), Zod validation, Helmet, CORS
+- ImgBB (image hosting, called server-side)
 
 ## Getting started
 
@@ -45,6 +46,7 @@ See [`.env.example`](.env.example) for the full, documented list.
 | `MONGODB_DB_NAME`    | no       | Database name (default `fixmate`) |
 | `BETTER_AUTH_SECRET` | yes      | At least 32 random characters (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL`    | yes      | Public origin the browser uses (the frontend URL, since it proxies `/api/*`) |
+| `IMGBB_API_KEY`      | uploads  | ImgBB key for service images and profile photos (kept server-side) |
 | `JWT_ISSUER`         | no       | Defaults to `BETTER_AUTH_URL` |
 | `JWT_AUDIENCE`       | no       | Default `fixmate-api` |
 | `ADMIN_EMAIL`        | seed     | Admin account created by `npm run seed` |
@@ -84,6 +86,7 @@ Private routes need `Authorization: Bearer <JWT>` (issued by Better Auth). Missi
 | `GET /api/admin/bookings` | verifyToken, verifyAdmin | All bookings (`?status=`) |
 | `GET /api/admin/payments` | verifyToken, verifyAdmin | All payments with total revenue |
 | `GET /api/users/profile` / `PATCH /api/users/profile` | verifyToken | Read / update my profile |
+| `POST /api/uploads/image` | verifyToken | Upload an image (raw JPG/PNG/WebP/GIF body, max 5 MB) to ImgBB; returns its URL |
 | `GET /api/bookings/:id` | verifyToken | One booking (own bookings only; admins see all) |
 
 ## Scripts
