@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { jwt } from "better-auth/plugins/jwt";
 import { env } from "../config/env.js";
 import { getNativeClient, getNativeDb } from "../db/client.js";
@@ -24,12 +24,42 @@ const DISABLED_AUTH_PATHS = [
   "/sign-in/social",
 ];
 
+/**
+ * The role chosen at sign-up (`role` in the request body). Anything other than "customer" or
+ * "technician" (including "admin") is saved as "customer".
+ */
 function resolveSignUpRole(body: unknown): UserRole {
-  const accountType = typeof body === "object" && body !== null && "accountType" in body ? body.accountType : undefined;
-  if (accountType === undefined) return "customer";
-  if (SELF_SERVICE_ROLES.some((role) => role === accountType)) return accountType as UserRole;
-  throw new APIError("BAD_REQUEST", { message: "accountType must be customer or technician" });
+  const requested = typeof body === "object" && body !== null && "role" in body ? body.role : undefined;
+  return SELF_SERVICE_ROLES.find((role) => role === requested) ?? "customer";
 }
+
+export const PASSWORD_RULES = { minLength: 6, maxLength: 128 } as const;
+
+/** At least 6 characters, with an uppercase and a lowercase letter. Returns the first problem, or null. */
+export function passwordProblem(password: unknown) {
+  if (typeof password !== "string" || password.length < PASSWORD_RULES.minLength) {
+    return `Password must be at least ${PASSWORD_RULES.minLength} characters`;
+  }
+  if (password.length > PASSWORD_RULES.maxLength) return `Password must be at most ${PASSWORD_RULES.maxLength} characters`;
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
+  if (!/[a-z]/.test(password)) return "Password must contain at least one lowercase letter";
+  return null;
+}
+
+/** Endpoints that set a password, and the body field holding it. */
+const PASSWORD_FIELDS: Record<string, string> = {
+  "/sign-up/email": "password",
+  "/change-password": "newPassword",
+  "/reset-password": "newPassword",
+};
+
+/** Enforces the password rules on the server, whatever the client does. */
+const passwordRulesHook = createAuthMiddleware(async (ctx) => {
+  const field = PASSWORD_FIELDS[ctx.path];
+  if (!field) return;
+  const problem = passwordProblem((ctx.body as Record<string, unknown> | undefined)?.[field]);
+  if (problem) throw new APIError("BAD_REQUEST", { message: problem });
+});
 
 function createAuth() {
   return betterAuth({
@@ -41,14 +71,15 @@ function createAuth() {
     database: mongodbAdapter(getNativeDb(), { client: getNativeClient() }),
     emailAndPassword: {
       enabled: true,
-      minPasswordLength: 8,
-      maxPasswordLength: 128,
+      minPasswordLength: PASSWORD_RULES.minLength,
+      maxPasswordLength: PASSWORD_RULES.maxLength,
     },
     // Share the `users` collection with the Mongoose model instead of creating a separate `user` collection.
     user: {
       modelName: "users",
       additionalFields: {
-        // `input: false`: never settable through sign-up or any auth endpoint. The hook below assigns it.
+        // `input: false` + default: a `role` sent at sign-up is replaced by "customer" here, and the
+        // create hook below then applies the chosen role if it is "customer" or "technician".
         role: { type: [...USER_ROLES], required: true, defaultValue: "customer", input: false },
         status: { type: [...USER_STATUSES], required: true, defaultValue: "active", input: false },
         // Profile fields, filled in later through PATCH /api/users/profile (not at sign-up).
@@ -62,6 +93,7 @@ function createAuth() {
       updateAge: 60 * 60 * 24,
     },
     disabledPaths: DISABLED_AUTH_PATHS,
+    hooks: { before: passwordRulesHook },
     databaseHooks: {
       user: {
         create: {
@@ -71,7 +103,7 @@ function createAuth() {
             if (name.length < 1 || name.length > 80) {
               throw new APIError("BAD_REQUEST", { message: "Name must be between 1 and 80 characters" });
             }
-            // Only email sign-up may request the technician role. Every other path creates a customer;
+            // Only email sign-up may choose the technician role. Every other path creates a customer;
             // the seed script promotes its admin account afterwards.
             const role = context?.path === "/sign-up/email" ? resolveSignUpRole(context.body) : "customer";
             return { data: { ...user, name, role, status: "active" } };
