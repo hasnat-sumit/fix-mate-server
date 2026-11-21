@@ -4,8 +4,8 @@ REST API for **FixMate**, a role-based platform where verified technicians list 
 
 | | |
 | --- | --- |
-| **API (live)** | `https://<your-server>.onrender.com` _(add after deploying; health check: `/api/health`)_ |
-| **Live site** | `https://<your-client>.vercel.app` _(add after deploying)_ |
+| **API (live)** | https://fix-mate-server-nine.vercel.app (health check: [/api/health](https://fix-mate-server-nine.vercel.app/api/health)) |
+| **Live site** | https://fix-mate-peach.vercel.app |
 | **Client repo** | https://github.com/hasnat-sumit/fix-mate |
 | **Server repo** | https://github.com/hasnat-sumit/fix-mate-server |
 
@@ -143,15 +143,18 @@ Both 2 and 3 go through one function that inserts the payment and marks the book
 
 Test card: `4242 4242 4242 4242`, any future date, any CVC.
 
-## Deployment (Render)
+## Deployment (Vercel)
 
-1. **MongoDB Atlas:** create a cluster and a database user; under Network Access allow `0.0.0.0/0` (Render has no fixed IP). Copy the connection string into `MONGODB_URI`.
-2. **Render → New Web Service** from this repo. Runtime: Node. Build command: `npm ci && npm run build`. Start command: `npm start`. Health check path: `/api/health`.
-3. **Environment:** `NODE_ENV=production`, `MONGODB_URI`, `MONGODB_DB_NAME`, `BETTER_AUTH_SECRET` (32+ random characters), `BETTER_AUTH_URL=https://<your-client>.vercel.app`, `CLIENT_ORIGINS=https://<your-client>.vercel.app` (comma-separate extra origins, e.g. a custom domain), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `IMGBB_API_KEY`. Render sets `PORT` itself.
-4. **Stripe webhook:** Dashboard (test mode) → Developers → Webhooks → add `https://<your-server>.onrender.com/api/payments/webhook` for `checkout.session.completed`; copy its signing secret into `STRIPE_WEBHOOK_SECRET` and redeploy.
-5. **Seed the production database** from your machine, with the production values in `.env` (plus `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SEED_USER_PASSWORD`): `npm run seed`. If `NODE_ENV=production` is set locally, use `npm run seed -- --allow-production`.
+The API runs on Vercel as a serverless function. `index.js` at the project root is the entry point: Vercel finds it before `src/`, and `vercel.json` runs `npm run build` first so it can load the compiled `dist/`. The first request on a new instance connects to MongoDB; later requests reuse the connection. (`npm run dev` locally still runs `src/server.ts` as a normal server.)
 
-Render's free plan sleeps after 15 minutes idle and takes up to a minute to wake. Before a review, open `/api/health` once (or keep it warm with an uptime pinger) so the first request isn't slow.
+1. **MongoDB Atlas:** create a cluster and a database user; under Network Access allow `0.0.0.0/0` (serverless functions have no fixed IP). Copy the connection string into `MONGODB_URI`.
+2. **Vercel → Add New → Project** and import this repository (framework preset: Express or Other; leave the output directory empty).
+3. **Environment variables (Production):** `NODE_ENV=production`, `MONGODB_URI`, `MONGODB_DB_NAME`, `BETTER_AUTH_SECRET` (32+ random characters), `BETTER_AUTH_URL` and `CLIENT_ORIGINS` set to the client's URL (here `https://fix-mate-peach.vercel.app`; comma-separate extra origins), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `IMGBB_API_KEY`. Do not set `DNS_SERVERS` or `PORT`. Redeploy after changing variables.
+4. **Stripe webhook:** Dashboard (test mode) → Workbench → Webhooks → add a destination `https://fix-mate-server-nine.vercel.app/api/payments/webhook` for `checkout.session.completed`; copy its signing secret (`whsec_...`) into `STRIPE_WEBHOOK_SECRET` and redeploy.
+5. **Seed the database** from your machine with the production values in `.env` (plus `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SEED_USER_PASSWORD`): `npm run seed`.
+6. **Check:** `https://fix-mate-server-nine.vercel.app/api/health` should report `"database":"connected"`.
+
+If a start-up problem occurs (e.g. a missing environment variable), requests get a 503 and the reason is logged under the project's **Logs** in Vercel.
 
 ## Scripts
 
