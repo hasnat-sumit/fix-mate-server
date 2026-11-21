@@ -16,6 +16,10 @@ import { usersRouter } from "./modules/users/users.routes.js";
 /** Requires `initAuth()` to have run, which in turn requires a connected database. */
 export function createApp() {
   const app = express();
+  // Hosting platforms (Render, Vercel) put a proxy in front of the app: trust its X-Forwarded-* headers
+  // so req.ip and the request protocol reflect the real client.
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
 
   // Order matters (see the architecture plan):
   // 1. Security headers and CORS.
