@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import Stripe from "stripe";
 import { env } from "../../config/env.js";
 import { AppError, isDuplicateKeyError } from "../../lib/errors.js";
@@ -26,31 +27,40 @@ export async function createCheckoutSession(bookingId: string, customerEmail: st
   if (booking.paymentStatus === "paid") throw new AppError(409, "CONFLICT", "This job is already paid");
   if (booking.status !== "completed") throw new AppError(409, "CONFLICT", "You can pay once the technician marks the job completed");
 
-  const unitAmount = toCents(booking.finalAmount);
-  const session = await getStripe().checkout.sessions.create(
-    {
-      mode: "payment",
-      customer_email: booking.customerEmail,
-      client_reference_id: bookingId,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "usd",
-            unit_amount: unitAmount,
-            product_data: { name: booking.serviceTitle, description: `Repair by ${booking.technicianName} · FixMate` },
-          },
+  const params: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    customer_email: booking.customerEmail,
+    client_reference_id: bookingId,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: toCents(booking.finalAmount),
+          product_data: { name: booking.serviceTitle, description: `Repair by ${booking.technicianName} · FixMate` },
         },
-      ],
-      metadata: { bookingId, customerEmail: booking.customerEmail },
-      payment_intent_data: { metadata: { bookingId } },
-      success_url: `${env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.CLIENT_URL}/payment/cancel?booking=${bookingId}`,
-    },
-    // Clicking Pay Now again for the same booking and amount returns the same open session (Stripe keeps
-    // idempotency keys for 24h, as long as a session lasts), so one job can't be charged through two sessions.
-    { idempotencyKey: `checkout-${bookingId}-${unitAmount}` },
-  );
+      },
+    ],
+    metadata: { bookingId, customerEmail: booking.customerEmail },
+    payment_intent_data: { metadata: { bookingId } },
+    success_url: `${env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${env.CLIENT_URL}/payment/cancel?booking=${bookingId}`,
+  };
+
+  // Clicking Pay Now again with identical details returns the same open session (Stripe keeps idempotency keys
+  // for 24h, as long as a session lasts), so one job can't be charged through two sessions. The key includes a
+  // fingerprint of every parameter: Stripe rejects a reused key with different parameters (e.g. another site URL
+  // or a changed amount), and those cases need their own session.
+  const fingerprint = createHash("sha256").update(JSON.stringify(params)).digest("hex").slice(0, 16);
+
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await getStripe().checkout.sessions.create(params, { idempotencyKey: `checkout-${bookingId}-${fingerprint}` });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    console.error("Stripe checkout session failed:", error instanceof Error ? error.message : error);
+    throw new AppError(502, "BAD_GATEWAY", "Stripe couldn't start the payment. Please try again in a moment.");
+  }
 
   if (!session.url) throw new AppError(502, "BAD_GATEWAY", "Stripe didn't return a checkout page. Please try again.");
   return session.url;
