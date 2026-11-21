@@ -9,7 +9,7 @@ REST API for **FixMate**, a role-based platform where verified technicians list 
 | **Client repo** | https://github.com/hasnat-sumit/fix-mate |
 | **Server repo** | https://github.com/hasnat-sumit/fix-mate-server |
 
-**Admin:** `<ADMIN_EMAIL>` / `<ADMIN_PASSWORD>`. Technician and customer test accounts are listed under [Seed data](#seed-data).
+**Admin:** `khsumit28@gmail.com` / `_Qwerty142528@`. Technician and customer test accounts are listed under [Seed data](#seed-data).
 
 ## Key features
 
