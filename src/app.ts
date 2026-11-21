@@ -8,7 +8,7 @@ import { getAuth } from "./lib/auth.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { bookingsRouter } from "./modules/bookings/bookings.routes.js";
-import { paymentsRouter } from "./modules/payments/payments.routes.js";
+import { paymentsRouter, stripeWebhookHandler } from "./modules/payments/payments.routes.js";
 import { servicesRouter } from "./modules/services/services.routes.js";
 import { uploadsRouter } from "./modules/uploads/uploads.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
@@ -19,10 +19,13 @@ export function createApp() {
 
   // Order matters (see the architecture plan):
   // 1. Security headers and CORS.
-  // 2. Raw-body routes (Stripe webhook, phase B8) and Better Auth mount here, BEFORE the JSON parser.
+  // 2. Raw-body routes (Stripe webhook) and Better Auth mount here, BEFORE the JSON parser.
   // 3. JSON parser, API routes, 404 and the error handler.
   app.use(helmet());
   app.use(cors({ origin: env.CLIENT_ORIGINS, credentials: true }));
+
+  // The Stripe webhook verifies its signature over the raw body, so it must come before express.json().
+  app.post("/api/payments/webhook", ...stripeWebhookHandler);
 
   // Better Auth reads the raw request stream itself, so it must come before express.json().
   app.all("/api/auth/*splat", toNodeHandler(getAuth()));

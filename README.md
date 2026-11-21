@@ -9,6 +9,7 @@ The frontend lives in a separate repository: **fixmate-client** (Next.js).
 - Node.js 22.12+, Express 5, TypeScript
 - MongoDB with Mongoose
 - Better Auth (sessions + JWT), Zod validation, Helmet, CORS
+- Stripe Checkout + webhook (test mode)
 - ImgBB (image hosting, called server-side)
 
 ## Getting started
@@ -46,6 +47,9 @@ See [`.env.example`](.env.example) for the full, documented list.
 | `MONGODB_DB_NAME`    | no       | Database name (default `fixmate`) |
 | `BETTER_AUTH_SECRET` | yes      | At least 32 random characters (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL`    | yes      | Public origin the browser uses (the frontend URL, since it proxies `/api/*`) |
+| `STRIPE_SECRET_KEY`  | payments | Stripe test secret key (`sk_test_...`) |
+| `STRIPE_WEBHOOK_SECRET` | webhook | Signing secret of the webhook endpoint (`whsec_...`) |
+| `CLIENT_URL`         | no       | Where Stripe returns customers; defaults to `BETTER_AUTH_URL` |
 | `IMGBB_API_KEY`      | uploads  | ImgBB key for service images and profile photos (kept server-side) |
 | `JWT_ISSUER`         | no       | Defaults to `BETTER_AUTH_URL` |
 | `JWT_AUDIENCE`       | no       | Default `fixmate-api` |
@@ -70,6 +74,9 @@ Private routes need `Authorization: Bearer <JWT>` (issued by Better Auth). Missi
 | `PATCH /api/bookings/:id/cancel` | verifyToken, verifyCustomer | Cancel a `requested` booking |
 | `POST /api/bookings/:id/review` | verifyToken, verifyCustomer | Rate a paid job |
 | `GET /api/payments/my` | verifyToken, verifyCustomer | My payment history |
+| `POST /api/payments/create-checkout-session` | verifyToken, verifyCustomer | Stripe Checkout for a completed, unpaid booking I own |
+| `GET /api/payments/verify?session_id=` | verifyToken, verifyCustomer | Confirm a paid session and save the payment (success page) |
+| `POST /api/payments/webhook` | Stripe signature | `checkout.session.completed` → save the payment |
 | `POST /api/services` | verifyToken, verifyTechnician | Add a service (starts `pending`) |
 | `GET /api/services/my` | verifyToken, verifyTechnician | My services |
 | `PATCH /api/services/:id` | verifyToken, verifyTechnician | Edit (back to `pending`) or toggle `isAvailable` |
@@ -88,6 +95,20 @@ Private routes need `Authorization: Bearer <JWT>` (issued by Better Auth). Missi
 | `GET /api/users/profile` / `PATCH /api/users/profile` | verifyToken | Read / update my profile |
 | `POST /api/uploads/image` | verifyToken | Upload an image (raw JPG/PNG/WebP/GIF body, max 5 MB) to ImgBB; returns its URL |
 | `GET /api/bookings/:id` | verifyToken | One booking (own bookings only; admins see all) |
+
+## Stripe payments
+
+Customers pay per job, only after the technician marks it completed.
+
+1. `POST /api/payments/create-checkout-session` loads the booking (never trusting a client amount) and creates a Checkout Session with `unit_amount = finalAmount × 100` and `bookingId` / `customerEmail` in the metadata.
+2. After paying, Stripe redirects to `/payment/success?session_id=…`, which calls `GET /api/payments/verify`.
+3. Stripe also calls `POST /api/payments/webhook` (`checkout.session.completed`).
+
+Both 2 and 3 go through one function that inserts the payment and marks the booking paid. Unique indexes on `payments.bookingId` and `payments.stripeSessionId` guarantee a payment is saved **once**, even when both arrive together or Stripe retries the webhook.
+
+**Webhook setup (test mode):** in the Stripe Dashboard add an endpoint `https://<server>/api/payments/webhook` for `checkout.session.completed`, and put its signing secret in `STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:5000/api/payments/webhook`.
+
+Test card: `4242 4242 4242 4242`, any future date, any CVC.
 
 ## Scripts
 
