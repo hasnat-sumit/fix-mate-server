@@ -1,299 +1,468 @@
-// Generated from the frontend mock catalog (src/data/services.ts).
-// Demo data only: example.com emails, illustrative profiles, prices in cents, no ratings or reviews.
+// Demo data for the live site: connected users, services and bookings so every flow can be tested.
+// Emails use the reserved example.com domain. Images are the frontend's bundled /images/ assets.
+
+import type { ServiceCategory } from "../modules/services/services.model.js";
+
+export type SeedUser = {
+  key: string;
+  name: string;
+  email: string;
+  phone: string;
+  area: string;
+  bio: string;
+};
 
 export const seedTechnicians = [
   {
-    "key": "amira",
-    "name": "Amira Chen",
-    "email": "amira.chen@example.com",
-    "bio": "Sample technician profile for the FixMate demo catalog. Experience and biography are illustrative."
+    key: "rafiq",
+    name: "Rafiq Hasan",
+    email: "rafiq.technician@example.com",
+    phone: "+880 1700-000101",
+    area: "Mirpur, Dhaka",
+    bio: "Smartphone and laptop technician with 8 years of bench experience: screens, batteries, charging ports, keyboards and thermal servicing.",
   },
   {
-    "key": "daniel",
-    "name": "Daniel Foster",
-    "email": "daniel.foster@example.com",
-    "bio": "Sample technician profile for the FixMate demo catalog. Experience and biography are illustrative."
+    key: "nusrat",
+    name: "Nusrat Jahan",
+    email: "nusrat.technician@example.com",
+    phone: "+880 1700-000102",
+    area: "Dhanmondi, Dhaka",
+    bio: "Certified HVAC and home appliance technician. Air conditioners, refrigerators and washing machines, serviced at your home.",
   },
   {
-    "key": "rafiq",
-    "name": "Rafiq Hasan",
-    "email": "rafiq.hasan@example.com",
-    "bio": "Sample technician profile for the FixMate demo catalog. Experience and biography are illustrative."
+    key: "tanvir",
+    name: "Tanvir Ahmed",
+    email: "tanvir.technician@example.com",
+    phone: "+880 1700-000103",
+    area: "Uttara, Dhaka",
+    bio: "Licensed electrician and TV repair specialist. LED/LCD panel faults, home wiring, switches and safety inspections.",
+  },
+] as const satisfies readonly SeedUser[];
+
+export const seedCustomers = [
+  {
+    key: "sadia",
+    name: "Sadia Rahman",
+    email: "sadia.customer@example.com",
+    phone: "+880 1800-000201",
+    area: "Gulshan, Dhaka",
+    bio: "",
   },
   {
-    "key": "priya",
-    "name": "Priya Nair",
-    "email": "priya.nair@example.com",
-    "bio": "Sample technician profile for the FixMate demo catalog. Experience and biography are illustrative."
+    key: "arif",
+    name: "Arif Hossain",
+    email: "arif.customer@example.com",
+    phone: "+880 1800-000202",
+    area: "Mohammadpur, Dhaka",
+    bio: "",
   },
-  {
-    "key": "mateo",
-    "name": "Mateo Alvarez",
-    "email": "mateo.alvarez@example.com",
-    "bio": "Sample technician profile for the FixMate demo catalog. Experience and biography are illustrative."
-  },
-  {
-    "key": "grace",
-    "name": "Grace Okafor",
-    "email": "grace.okafor@example.com",
-    "bio": "Sample technician profile for the FixMate demo catalog. Experience and biography are illustrative."
-  }
-] as const;
+] as const satisfies readonly SeedUser[];
 
 export type SeedTechnicianKey = (typeof seedTechnicians)[number]["key"];
+export type SeedCustomerKey = (typeof seedCustomers)[number]["key"];
 
 export type SeedService = {
-  technicianKey: SeedTechnicianKey;
+  key: string;
+  technician: SeedTechnicianKey;
   title: string;
-  category: string;
+  category: ServiceCategory;
   description: string;
-  details: string;
-  price: number;
   image: string;
-  includes: string[];
-  availability: string;
-  isFeatured: boolean;
+  basePrice: number;
+  estimatedDuration: string;
+  serviceMode: "Home Visit" | "Shop Drop-off";
+  serviceArea: string;
+  approvalStatus: "approved" | "pending" | "rejected";
+  /** Days before the seed run, so "Newest" sorting and the featured section have a stable order. */
+  createdDaysAgo: number;
+};
+
+const IMG = {
+  phone: "/images/smartphone-screen-repair.webp",
+  laptop: "/images/laptop-repair.webp",
+  ac: "/images/air-conditioner-service.webp",
+  fridge: "/images/refrigerator-maintenance.webp",
+  tv: "/images/television-repair.webp",
+  electrical: "/images/electrical-service.webp",
 };
 
 export const seedServices: SeedService[] = [
+  // Rafiq — Smartphone, Laptop & PC
   {
-    "technicianKey": "amira",
-    "title": "Phone screen replacement",
-    "category": "Smartphone",
-    "description": "A clean, precise screen repair with quality tested parts.",
-    "details": "Example phone screen service details for the FixMate demo catalog. A provider would confirm the device model, part options, and final quote before work begins.",
-    "price": 4900,
-    "image": "/images/smartphone-screen-repair.webp",
-    "includes": [
-      "Device inspection",
-      "Repair options review",
-      "Post-repair function check"
-    ],
-    "availability": "Example weekday and Saturday appointments",
-    "isFeatured": true
+    key: "phone-screen",
+    technician: "rafiq",
+    title: "iPhone & Android Screen Replacement",
+    category: "Smartphone",
+    description:
+      "Cracked or unresponsive display replaced with a quality tested panel. Includes a full touch, camera and Face ID/fingerprint check after the repair, plus a 3-month warranty on the part.",
+    image: IMG.phone,
+    basePrice: 45,
+    estimatedDuration: "1-2 hours",
+    serviceMode: "Shop Drop-off",
+    serviceArea: "Mirpur, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 30,
   },
   {
-    "technicianKey": "daniel",
-    "title": "Laptop diagnostic & tune-up",
-    "category": "Laptop & PC",
-    "description": "Get to the root of slowdowns, heat and unexpected crashes.",
-    "details": "Example laptop diagnostic details for the FixMate demo catalog. The technician would discuss the findings and any additional work before proceeding.",
-    "price": 3900,
-    "image": "/images/laptop-repair.webp",
-    "includes": [
-      "Startup and performance checks",
-      "Thermal inspection",
-      "Recommended next steps"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": true
+    key: "phone-battery",
+    technician: "rafiq",
+    title: "Smartphone Battery Replacement",
+    category: "Smartphone",
+    description:
+      "Phone dying by afternoon or shutting down at 20%? We replace the worn battery with a new high-capacity cell, recalibrate charging and test for swelling or heat issues.",
+    image: IMG.phone,
+    basePrice: 25,
+    estimatedDuration: "1 hour",
+    serviceMode: "Shop Drop-off",
+    serviceArea: "Mirpur, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 27,
   },
   {
-    "technicianKey": "rafiq",
-    "title": "Air conditioner service",
-    "category": "Air Conditioning",
-    "description": "Seasonal cleaning and performance checks for a cooler home.",
-    "details": "Example air conditioner service details for the FixMate demo catalog. The scope and any required parts would be confirmed after an initial inspection.",
-    "price": 6900,
-    "image": "/images/air-conditioner-service.webp",
-    "includes": [
-      "Filter and airflow inspection",
-      "Basic unit cleaning",
-      "Operation check"
-    ],
-    "availability": "Example weekday and weekend appointments",
-    "isFeatured": true
+    key: "phone-port",
+    technician: "rafiq",
+    title: "Charging Port Cleaning & Repair",
+    category: "Smartphone",
+    description:
+      "Loose cable or slow charging fixed: the port is cleaned of lint and corrosion, and replaced if damaged. Fast-charging and data transfer are tested before handover.",
+    image: IMG.phone,
+    basePrice: 18,
+    estimatedDuration: "45 minutes",
+    serviceMode: "Home Visit",
+    serviceArea: "Mirpur & Pallabi, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 22,
   },
   {
-    "technicianKey": "priya",
-    "title": "Refrigerator maintenance",
-    "category": "Home Appliances",
-    "description": "Routine care to keep your refrigerator clean and running well.",
-    "details": "Example refrigerator maintenance details for the FixMate demo catalog. A technician would confirm the appliance and the requested maintenance before scheduling.",
-    "price": 5500,
-    "image": "/images/refrigerator-maintenance.webp",
-    "includes": [
-      "Door seal check",
-      "Interior care guidance",
-      "Cooling performance check"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": true
+    key: "laptop-tuneup",
+    technician: "rafiq",
+    title: "Laptop Diagnostic & Performance Tune-up",
+    category: "Laptop & PC",
+    description:
+      "Slow boot, freezes or random restarts diagnosed end to end: storage health, RAM, startup programs and malware. Includes OS optimisation and an upgrade recommendation if needed.",
+    image: IMG.laptop,
+    basePrice: 30,
+    estimatedDuration: "2-3 hours",
+    serviceMode: "Shop Drop-off",
+    serviceArea: "Mirpur, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 20,
   },
   {
-    "technicianKey": "mateo",
-    "title": "TV troubleshooting",
-    "category": "Television",
-    "description": "Restore the picture, sound and connections you rely on.",
-    "details": "Example television troubleshooting details for the FixMate demo catalog. Repair options and parts would be discussed after diagnosis.",
-    "price": 4500,
-    "image": "/images/television-repair.webp",
-    "includes": [
-      "Display and sound checks",
-      "Connection inspection",
-      "Repair recommendations"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": true
+    key: "laptop-keyboard",
+    technician: "rafiq",
+    title: "Laptop Keyboard Replacement",
+    category: "Laptop & PC",
+    description:
+      "Sticky, missing or dead keys? The keyboard is replaced with a model-matched part, backlight included where supported, and every key is tested after fitting.",
+    image: IMG.laptop,
+    basePrice: 40,
+    estimatedDuration: "1 day",
+    serviceMode: "Shop Drop-off",
+    serviceArea: "Mirpur, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 16,
   },
   {
-    "technicianKey": "grace",
-    "title": "Home electrical check",
-    "category": "Electrical Services",
-    "description": "A careful inspection of outlets, switches and lighting.",
-    "details": "Example home electrical inspection details for the FixMate demo catalog. Work scope and any safety concerns would be explained before repair work begins.",
-    "price": 5900,
-    "image": "/images/electrical-service.webp",
-    "includes": [
-      "Outlet and switch inspection",
-      "Lighting check",
-      "Written next steps"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": true
+    key: "laptop-thermal",
+    technician: "rafiq",
+    title: "Laptop Overheating Fix & Thermal Paste",
+    category: "Laptop & PC",
+    description:
+      "Fan noise and overheating solved with an internal dust clean, fresh thermal paste on CPU/GPU and a fan check. Stress-tested afterwards to confirm lower temperatures.",
+    image: IMG.laptop,
+    basePrice: 22,
+    estimatedDuration: "2 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Mirpur & Kafrul, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 12,
+  },
+  // Nusrat — AC, Refrigerator, Washing Machine
+  {
+    key: "ac-service",
+    technician: "nusrat",
+    title: "Split AC Full Servicing",
+    category: "AC",
+    description:
+      "Complete split AC service at home: indoor and outdoor unit wash, filter and coil cleaning, drain line flush, gas pressure check and cooling performance test.",
+    image: IMG.ac,
+    basePrice: 28,
+    estimatedDuration: "2 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Dhanmondi & Lalmatia, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 29,
   },
   {
-    "technicianKey": "amira",
-    "title": "Phone battery replacement",
-    "category": "Smartphone",
-    "description": "Check battery health and review replacement options.",
-    "details": "Example phone battery service details for the FixMate demo catalog. Device compatibility and parts would be confirmed with the provider.",
-    "price": 3500,
-    "image": "/images/smartphone-screen-repair.webp",
-    "includes": [
-      "Battery health check",
-      "Replacement options",
-      "Charging function check"
-    ],
-    "availability": "Example weekday and Saturday appointments",
-    "isFeatured": false
+    key: "ac-gas",
+    technician: "nusrat",
+    title: "AC Gas Refill & Leak Repair",
+    category: "AC",
+    description:
+      "AC running but not cooling? We locate and seal refrigerant leaks, vacuum the system and recharge it with the correct gas to the manufacturer's pressure.",
+    image: IMG.ac,
+    basePrice: 55,
+    estimatedDuration: "3-4 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Dhanmondi, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 18,
   },
   {
-    "technicianKey": "amira",
-    "title": "Phone charging port service",
-    "category": "Smartphone",
-    "description": "Inspect charging issues and clean accessible port debris.",
-    "details": "Example charging port service details for the FixMate demo catalog. Any hardware repair would be quoted separately after inspection.",
-    "price": 2500,
-    "image": "/images/smartphone-screen-repair.webp",
-    "includes": [
-      "Charging symptom review",
-      "Accessible port cleaning",
-      "Charging test"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
+    key: "fridge-maintenance",
+    technician: "nusrat",
+    title: "Refrigerator Cooling Problem Repair",
+    category: "Refrigerator",
+    description:
+      "Fridge not cooling, freezing up or leaking water? Diagnosis of thermostat, compressor relay, fan and defrost system, with on-site repair for most faults.",
+    image: IMG.fridge,
+    basePrice: 35,
+    estimatedDuration: "2-3 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Dhanmondi & Mohammadpur, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 25,
   },
   {
-    "technicianKey": "daniel",
-    "title": "Laptop keyboard repair",
-    "category": "Laptop & PC",
-    "description": "Investigate unresponsive, damaged or sticking laptop keys.",
-    "details": "Example laptop keyboard service details for the FixMate demo catalog. The device model and compatible replacement parts would be confirmed first.",
-    "price": 6500,
-    "image": "/images/laptop-repair.webp",
-    "includes": [
-      "Keyboard inspection",
-      "Repair options",
-      "Key function test"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
+    key: "fridge-gas",
+    technician: "nusrat",
+    title: "Refrigerator Gas Charging",
+    category: "Refrigerator",
+    description:
+      "Restores cooling in refrigerators that have lost refrigerant: leak test, brazing repair where needed, vacuum and recharge, followed by a 24-hour temperature check.",
+    image: IMG.fridge,
+    basePrice: 48,
+    estimatedDuration: "1 day",
+    serviceMode: "Home Visit",
+    serviceArea: "Dhanmondi, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 9,
   },
   {
-    "technicianKey": "daniel",
-    "title": "Laptop thermal cleaning",
-    "category": "Laptop & PC",
-    "description": "Check cooling performance and clear accessible ventilation.",
-    "details": "Example laptop thermal service details for the FixMate demo catalog. The technician would explain any additional maintenance recommendations.",
-    "price": 4900,
-    "image": "/images/laptop-repair.webp",
-    "includes": [
-      "Fan and vent inspection",
-      "Accessible dust removal",
-      "Temperature check"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
+    key: "washer-repair",
+    technician: "nusrat",
+    title: "Washing Machine Repair (Front & Top Load)",
+    category: "Washing Machine",
+    description:
+      "Drum not spinning, water not draining or error codes on the display? Motor, pump, belt and control board diagnosis with repair at your home.",
+    image: IMG.fridge,
+    basePrice: 32,
+    estimatedDuration: "2-3 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Dhanmondi & Kalabagan, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 6,
+  },
+  // Tanvir — TV, Electrical
+  {
+    key: "tv-repair",
+    technician: "tanvir",
+    title: "LED/LCD TV Display & Power Repair",
+    category: "TV",
+    description:
+      "No picture, lines on screen, or TV won't turn on? Power board, backlight and T-con faults diagnosed and repaired, with a full picture and sound test.",
+    image: IMG.tv,
+    basePrice: 38,
+    estimatedDuration: "1-2 days",
+    serviceMode: "Shop Drop-off",
+    serviceArea: "Uttara, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 24,
   },
   {
-    "technicianKey": "priya",
-    "title": "Refrigerator cooling check",
-    "category": "Home Appliances",
-    "description": "Review temperature, door seals and everyday cooling concerns.",
-    "details": "Example refrigerator cooling service details for the FixMate demo catalog. Diagnosis and any repair quote would be confirmed during the appointment.",
-    "price": 4500,
-    "image": "/images/refrigerator-maintenance.webp",
-    "includes": [
-      "Temperature review",
-      "Door seal check",
-      "Recommended next steps"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
+    key: "tv-mount",
+    technician: "tanvir",
+    title: "TV Wall Mounting & Setup",
+    category: "TV",
+    description:
+      "Secure wall mounting for TVs up to 75 inches with a level, hidden-cable finish, followed by channel, Wi-Fi and smart app setup.",
+    image: IMG.tv,
+    basePrice: 20,
+    estimatedDuration: "1-2 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Uttara & Airport, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 4,
   },
   {
-    "technicianKey": "mateo",
-    "title": "TV picture and sound check",
-    "category": "Television",
-    "description": "Check picture quality, sound output and connected devices.",
-    "details": "Example television picture and sound service details for the FixMate demo catalog. The provider would discuss findings before any repair.",
-    "price": 3500,
-    "image": "/images/television-repair.webp",
-    "includes": [
-      "Display test",
-      "Audio check",
-      "Input and cable review"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
+    key: "wiring-check",
+    technician: "tanvir",
+    title: "Home Electrical Wiring Inspection",
+    category: "Electrical",
+    description:
+      "Full safety check of your home's wiring, distribution board, earthing and breakers. You get a written list of issues found and a quote for any repairs.",
+    image: IMG.electrical,
+    basePrice: 26,
+    estimatedDuration: "2-3 hours",
+    serviceMode: "Home Visit",
+    serviceArea: "Uttara, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 14,
   },
   {
-    "technicianKey": "grace",
-    "title": "Electrical outlet inspection",
-    "category": "Electrical Services",
-    "description": "Inspect outlet and switch concerns around your home.",
-    "details": "Example electrical outlet service details for the FixMate demo catalog. A qualified professional would confirm the work scope before starting.",
-    "price": 3900,
-    "image": "/images/electrical-service.webp",
-    "includes": [
-      "Outlet symptom review",
-      "Visual inspection",
-      "Repair recommendations"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
+    key: "switch-socket",
+    technician: "tanvir",
+    title: "Switch, Socket & Light Fitting Repair",
+    category: "Electrical",
+    description:
+      "Faulty switches, sparking sockets or flickering lights repaired or replaced with quality fittings. Price covers the visit and up to three points.",
+    image: IMG.electrical,
+    basePrice: 15,
+    estimatedDuration: "1 hour",
+    serviceMode: "Home Visit",
+    serviceArea: "Uttara & Uttarkhan, Dhaka",
+    approvalStatus: "approved",
+    createdDaysAgo: 2,
+  },
+  // Waiting for and refused by the admin, so the approval screens have something to show.
+  {
+    key: "washer-drum",
+    technician: "nusrat",
+    title: "Washing Machine Drum Bearing Replacement",
+    category: "Washing Machine",
+    description:
+      "Loud rumbling during the spin cycle usually means worn drum bearings. We replace the bearings and seals and test the machine through a full wash cycle.",
+    image: IMG.fridge,
+    basePrice: 60,
+    estimatedDuration: "1 day",
+    serviceMode: "Home Visit",
+    serviceArea: "Dhanmondi, Dhaka",
+    approvalStatus: "pending",
+    createdDaysAgo: 1,
   },
   {
-    "technicianKey": "rafiq",
-    "title": "Air conditioner cleaning",
-    "category": "Air Conditioning",
-    "description": "Clean accessible filters and check airflow performance.",
-    "details": "Example air conditioner cleaning details for the FixMate demo catalog. Unit type and cleaning scope would be confirmed before a visit.",
-    "price": 4900,
-    "image": "/images/air-conditioner-service.webp",
-    "includes": [
-      "Filter care",
-      "Airflow check",
-      "Basic operation test"
-    ],
-    "availability": "Example weekday and weekend appointments",
-    "isFeatured": false
+    key: "fan-install",
+    technician: "tanvir",
+    title: "Ceiling Fan Installation",
+    category: "Electrical",
+    description:
+      "New ceiling fan fitted with a secure hook, regulator wiring and balance check. Old fan removed and taken away on request.",
+    image: IMG.electrical,
+    basePrice: 12,
+    estimatedDuration: "1 hour",
+    serviceMode: "Home Visit",
+    serviceArea: "Uttara, Dhaka",
+    approvalStatus: "rejected",
+    createdDaysAgo: 3,
+  },
+];
+
+export type SeedServiceKey = (typeof seedServices)[number]["key"];
+
+export type SeedBooking = {
+  customer: SeedCustomerKey;
+  service: SeedServiceKey;
+  address: string;
+  problemDescription: string;
+  /** Negative = in the past. */
+  preferredInDays: number;
+  /** The path the job took; the last entry is its current status. */
+  path: ("requested" | "accepted" | "rejected" | "in-progress" | "completed" | "cancelled")[];
+  finalAmount?: number;
+  paid?: boolean;
+  rating?: number;
+  review?: string;
+  createdDaysAgo: number;
+};
+
+/** Bookings in every status. Rafiq (the main test technician) has a job in each one. */
+export const seedBookings: SeedBooking[] = [
+  {
+    customer: "sadia",
+    service: "phone-screen",
+    address: "House 12, Road 45, Gulshan 2, Dhaka",
+    problemDescription: "Dropped my phone and the screen is cracked across the top. Touch stops working on the right side.",
+    preferredInDays: 3,
+    path: ["requested"],
+    createdDaysAgo: 0,
   },
   {
-    "technicianKey": "priya",
-    "title": "Small appliance assessment",
-    "category": "Home Appliances",
-    "description": "Get an initial assessment for a small household appliance.",
-    "details": "Example small appliance assessment details for the FixMate demo catalog. Appliance type and available repair options would be reviewed with a provider.",
-    "price": 2900,
-    "image": "/images/refrigerator-maintenance.webp",
-    "includes": [
-      "Appliance symptom review",
-      "Initial inspection",
-      "Next step recommendations"
-    ],
-    "availability": "Example weekday appointments",
-    "isFeatured": false
-  }
+    customer: "arif",
+    service: "laptop-keyboard",
+    address: "Flat 4B, Block C, Tajmahal Road, Mohammadpur, Dhaka",
+    problemDescription: "Spilled tea on the keyboard last week. The E, R and space keys no longer respond at all.",
+    preferredInDays: 2,
+    path: ["requested", "accepted"],
+    createdDaysAgo: 2,
+  },
+  {
+    customer: "sadia",
+    service: "laptop-tuneup",
+    address: "House 12, Road 45, Gulshan 2, Dhaka",
+    problemDescription: "Laptop takes about five minutes to boot and freezes whenever I open more than a few browser tabs.",
+    preferredInDays: -1,
+    path: ["requested", "accepted", "in-progress"],
+    createdDaysAgo: 4,
+  },
+  {
+    customer: "arif",
+    service: "phone-battery",
+    address: "Flat 4B, Block C, Tajmahal Road, Mohammadpur, Dhaka",
+    problemDescription: "Battery drains from full to 20% in about three hours and the phone gets hot while charging.",
+    preferredInDays: -4,
+    path: ["requested", "accepted", "in-progress", "completed"],
+    finalAmount: 28,
+    createdDaysAgo: 7,
+  },
+  {
+    customer: "sadia",
+    service: "phone-port",
+    address: "House 12, Road 45, Gulshan 2, Dhaka",
+    problemDescription: "Charger only works if I hold the cable at an angle. It has become worse over the last month.",
+    preferredInDays: -9,
+    path: ["requested", "accepted", "in-progress", "completed"],
+    finalAmount: 18,
+    paid: true,
+    rating: 5,
+    review: "Quick and careful work. Charging is perfect again and he explained what was wrong.",
+    createdDaysAgo: 12,
+  },
+  {
+    customer: "arif",
+    service: "laptop-thermal",
+    address: "Flat 4B, Block C, Tajmahal Road, Mohammadpur, Dhaka",
+    problemDescription: "Laptop fan is extremely loud and the bottom gets too hot to keep on my lap during video calls.",
+    preferredInDays: -2,
+    path: ["requested", "rejected"],
+    createdDaysAgo: 5,
+  },
+  {
+    customer: "sadia",
+    service: "laptop-keyboard",
+    address: "House 12, Road 45, Gulshan 2, Dhaka",
+    problemDescription: "Some keys on my laptop keyboard are sticky and the backlight stopped working on the left half.",
+    preferredInDays: -6,
+    path: ["requested", "cancelled"],
+    createdDaysAgo: 8,
+  },
+  {
+    customer: "arif",
+    service: "ac-service",
+    address: "Flat 4B, Block C, Tajmahal Road, Mohammadpur, Dhaka",
+    problemDescription: "Bedroom AC cools very slowly and water drips from the indoor unit onto the wall.",
+    preferredInDays: -14,
+    path: ["requested", "accepted", "in-progress", "completed"],
+    finalAmount: 32,
+    paid: true,
+    createdDaysAgo: 17,
+  },
+  {
+    customer: "sadia",
+    service: "fridge-maintenance",
+    address: "House 12, Road 45, Gulshan 2, Dhaka",
+    problemDescription: "The freezer works but the fridge section is warm, and there is ice building up at the back.",
+    preferredInDays: 5,
+    path: ["requested"],
+    createdDaysAgo: 1,
+  },
+  {
+    customer: "sadia",
+    service: "tv-repair",
+    address: "House 12, Road 45, Gulshan 2, Dhaka",
+    problemDescription: "TV turns on with sound but the screen stays black. A faint picture is visible with a torch.",
+    preferredInDays: 1,
+    path: ["requested", "accepted"],
+    createdDaysAgo: 3,
+  },
 ];
