@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import mongoose from "mongoose";
 import { env } from "../config/env.js";
 
@@ -6,6 +7,8 @@ mongoose.set("autoIndex", false);
 mongoose.set("strictQuery", true);
 
 export async function connectDatabase() {
+  // The MongoDB driver resolves mongodb+srv:// hosts through Node's DNS, so this applies to it.
+  if (env.DNS_SERVERS) dns.setServers(env.DNS_SERVERS);
   await mongoose.connect(env.MONGODB_URI, {
     dbName: env.MONGODB_DB_NAME,
     serverSelectionTimeoutMS: 10_000,

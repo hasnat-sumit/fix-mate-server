@@ -27,6 +27,14 @@ const envSchema = z.object({
   MONGODB_URI: z
     .string()
     .regex(/^mongodb(\+srv)?:\/\//, "Must be a mongodb:// or mongodb+srv:// connection string"),
+  // Optional, comma-separated (e.g. "8.8.8.8,1.1.1.1"). For machines whose local DNS refuses the SRV lookup
+  // that mongodb+srv:// connection strings need. Leave unset on hosting platforms.
+  DNS_SERVERS: optional(
+    z
+      .string()
+      .transform((value) => value.split(",").map((server) => server.trim()).filter(Boolean))
+      .pipe(z.array(z.ipv4()).min(1)),
+  ),
   MONGODB_DB_NAME: z.string().regex(/^[A-Za-z0-9_-]{1,38}$/, "Invalid database name").default("fixmate"),
   BETTER_AUTH_SECRET: z.string().min(32, "Must be at least 32 characters (generate with: openssl rand -base64 32)"),
   // The public origin the browser uses. Because Next.js proxies /api/*, this is the frontend's origin.
