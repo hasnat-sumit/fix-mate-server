@@ -112,9 +112,11 @@ async function seedAdmin() {
     console.log("ADMIN_EMAIL / ADMIN_PASSWORD not set; skipping the admin account");
     return;
   }
-  // An existing admin keeps its current password, so a re-run never undoes a password change.
-  await upsertAccount({ name: "FixMate Admin", email: env.ADMIN_EMAIL }, "admin", env.ADMIN_PASSWORD, { resetPassword: false });
-  console.log(`Admin account ${env.ADMIN_EMAIL} is ready`);
+  // An existing admin keeps its current password, so a re-run never undoes a password change,
+  // unless `--reset-admin-password` asks to set it to ADMIN_PASSWORD.
+  const resetPassword = process.argv.includes("--reset-admin-password");
+  await upsertAccount({ name: "FixMate Admin", email: env.ADMIN_EMAIL }, "admin", env.ADMIN_PASSWORD, { resetPassword });
+  console.log(`Admin account ${env.ADMIN_EMAIL} is ready${resetPassword ? " (password reset to ADMIN_PASSWORD)" : ""}`);
 }
 
 /** Technician and customer test accounts, all sharing SEED_USER_PASSWORD. */

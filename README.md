@@ -63,6 +63,8 @@ The API runs on [http://localhost:5000](http://localhost:5000) by default.
 - 17 services across all 7 categories (15 approved, 1 pending, 1 rejected)
 - 10 bookings covering every status, 2 of them paid (with payment records)
 
+Changing `SEED_USER_PASSWORD` and re-running the seed updates the demo accounts. An existing admin keeps its password unless you run `npm run seed -- --reset-admin-password`. Re-running also resets the demo customers' bookings and payments to the seeded set.
+
 To seed a production database, run `npm run seed -- --allow-production` with the production `.env`.
 
 ## Environment variables
