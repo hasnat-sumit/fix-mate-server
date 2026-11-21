@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isObjectIdString } from "../../lib/validators.js";
+import { isObjectIdString, usdAmountSchema } from "../../lib/validators.js";
 import { BOOKING_STATUSES } from "./bookings.model.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -20,12 +20,13 @@ const preferredDate = z
   .refine((value) => value <= utcDate(Date.now() + 365 * DAY_MS), "Choose a date within the next year")
   .transform((value) => new Date(`${value}T00:00:00Z`));
 
+/** Name and email come from the session; service and technician details from the database. */
 export const createBookingBody = z.strictObject({
   serviceId: z.string().refine(isObjectIdString, "Invalid service"),
+  customerPhone: z.string().trim().regex(/^\+?[0-9\s()-]{7,20}$/, "Enter a valid phone number"),
+  address: z.string().trim().min(5, "Enter the service address").max(200),
   preferredDate,
   problemDescription: z.string().trim().min(20, "Describe the problem in at least 20 characters").max(1000),
-  address: z.string().trim().min(5, "Enter the service address").max(200),
-  contactPhone: z.string().trim().regex(/^\+?[0-9\s()-]{7,20}$/, "Enter a valid phone number"),
 });
 
 export const listBookingsQuery = z.object({
@@ -34,12 +35,13 @@ export const listBookingsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-export const updateStatusBody = z.strictObject({
-  status: z.enum(BOOKING_STATUSES),
-  note: z.string().trim().max(500).optional(),
-});
+/** Completing a job requires the final amount; other changes must not send one. */
+export const updateStatusBody = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("completed"), finalAmount: usdAmountSchema }),
+  z.strictObject({ status: z.enum(BOOKING_STATUSES).exclude(["completed"]) }),
+]);
 
 export const createReviewBody = z.strictObject({
   rating: z.number().int("Rating must be a whole number").min(1).max(5),
-  comment: z.string().trim().max(1000).default(""),
+  review: z.string().trim().max(1000).default(""),
 });
